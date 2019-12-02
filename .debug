@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionList>
+    <Extension Id="com.mason.panel">
+        <HostList>
+            <Host Name="AEFT" Port="6677" />
+        </HostList>
+    </Extension>
+    <Extension Id="com.mason.modal">
+        <HostList>
+            <Host Name="AEFT" Port="6678" />
+        </HostList>
+    </Extension>
+</ExtensionList>
