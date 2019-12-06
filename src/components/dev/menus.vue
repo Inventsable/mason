@@ -8,9 +8,7 @@
 // All changes and modifications trigger redraw of menu and events.
 // Modify either menu with .push() or other array methods and see results instantly
 let isBrowser = !window.__adobe_cep__;
-const spy = isBrowser
-  ? require("../../utils/fake-spy")
-  : require("cep-spy").default;
+const spy = require("cep-spy").default;
 
 // Access this component anywhere via this.app.menus (this.$root.$children[0].menus)
 export default {

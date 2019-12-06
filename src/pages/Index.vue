@@ -37,6 +37,7 @@
 <script>
 import { mapGetters, mapActions } from "vuex";
 import { evalScript } from "cluecumber";
+import spy from "cep-spy";
 
 export default {
   components: {
@@ -194,6 +195,7 @@ export default {
       newConfig["labels"] = this.compLabels.map(label => {
         return this.hexToRGB(label);
       });
+      newConfig["version"] = spy.extVersion;
       return JSON.stringify(newConfig);
     }
   },
@@ -223,6 +225,7 @@ export default {
     },
     async generateShapes() {
       await this.scanComp();
+      console.log(this.shapeData);
       let sorted = this.sortByNameAndIndex(this.shapeData);
       // This could handle both forms of transmission via param
       await evalScript(

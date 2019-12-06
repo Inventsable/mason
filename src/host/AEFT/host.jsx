@@ -1,3 +1,12 @@
+/*
+
+Current expressions are hilariously complex. New template should be:
+
+let parent = thisComp.layer('line')
+let path = parent.content('line').content("Path 1").path;
+parent.toComp(path.points()[1])
+
+*/
 var currentTime = null;
 var thisComp = setComp();
 function setComp() {
@@ -89,8 +98,17 @@ function createReceivingStick(config, data) {
         .setValue(config.stickStrokeWidth);
     // Isn't this the same as a transmitter except the expression?
     // Why not just replace the expression here with a ternary:
-    parent.property(1).property(2).expression = receiverPositionExpressionFactory(data);
+    parent.property(1).property(2).expression = receiverPositionExpressionFactory(data, config);
+    layer.transform.position.setValue([0, 0, 0]);
+    // layer.transform.anchorPoint.setValue(getParentOffset(data));
     createReceivingConfig(config, data, layer);
+}
+function getParentOffset(data) {
+    var vertex = [0, 0];
+    var parent = thisComp.layers.byName(data.parentLayerName);
+    return vertex.map(function (item, i) {
+        return (parent.transform.position.value[i] + parent.transform.anchorPoint.value[i]);
+    });
 }
 function createReceivingHandle(config, data) {
     var layer = createReceivingLayer(config, data);
@@ -102,14 +120,14 @@ function createReceivingHandle(config, data) {
     createReceivingStyle("handle", parent, layer, config, data);
     layer
         .property("Transform")
-        .property("Position").expression = receiverPositionExpressionFactory(data);
+        .property("Position").expression = receiverPositionExpressionFactory(data, config);
     createReceivingConfig(config, data, layer);
 }
 function createReceivingLayer(config, data) {
     var layer = thisComp.layers.addShape();
     layer.name = data.name;
-    layer.parent = thisComp.layers.byName(data.parentLayerName);
-    layer.label = layer.parent.label;
+    // layer.parent = thisComp.layers.byName(data.parentLayerName);
+    layer.label = thisComp.layers.byName(data.parentLayerName).label;
     return layer;
 }
 function createReceivingChain(config, data, layer) {
@@ -123,7 +141,7 @@ function createReceivingStyle(type, parent, layer, config, data) {
         anchorStroke
             .property("ADBE Vector Stroke Color")
             .setValue(config.labelOverride
-            ? config.labels[layer.parent.label]
+            ? config.labels[thisComp.layers.byName(data.parentLayerName).label]
             : config[type + "Color"]);
         anchorStroke
             .property("ADBE Vector Stroke Width")
@@ -161,7 +179,7 @@ function createReceivingAnchor(config, data) {
     createReceivingStyle("anchor", parent, layer, config, data);
     layer
         .property("Transform")
-        .property("Position").expression = receiverPositionExpressionFactory(data);
+        .property("Position").expression = receiverPositionExpressionFactory(data, config);
     createReceivingConfig(config, data, layer);
 }
 function createReceivingConfig(config, data, layer) {
@@ -171,24 +189,22 @@ function createReceivingConfig(config, data, layer) {
     // This alwas leaves last layer as selected
     // layer.locked = config.locked;
 }
-function receiverPositionExpressionFactory(data) {
+function receiverPositionExpressionFactory(data, config) {
     var datablock, datafooter;
     if (data.type == "anchor") {
-        datablock = "let vertices = [0];\n\nconst data = {\n  vertex: parentPath.points()[" + data.index + "]\n};";
-        datafooter = "vertices.map((index, i) => {\n  let offsetX = 0;\n  let offsetY = 0;\n  Object.keys(data).forEach((val, e) => {\n    offsetX = offsetX + data[val][0];\n    offsetY = offsetY + data[val][1];\n  });\n  return [offsetX, offsetY];\n})[0];";
+        datablock = "parent.toComp(path.points()[" + data.index + "])";
     }
     else if (/tangent/i.test(data.type)) {
-        datablock = "let vertices = [0];\n    \nconst data = {\n  vertex: parentPath.points()[" + data.index + "],\n  tangent: parentPath." + data.direction.toLowerCase() + "Tangents()[" + data.index + "]\n};";
-        datafooter = "vertices.map((index, i) => {\n  let offsetX = 0;\n  let offsetY = 0;\n  Object.keys(data).forEach((val, e) => {\n    offsetX = offsetX + data[val][0];\n    offsetY = offsetY + data[val][1];\n  });\n  return [offsetX, offsetY];\n})[0];";
+        datablock = "parent.toComp(add(path." + data.direction.toLowerCase() + "Tangents()[" + data.index + "], path.points()[" + data.index + "]))";
     }
     else if (/stick/i.test(data.type)) {
-        datablock = "let vertices = [0, 1];\n    \nconst data = {\n  vertex: parentPath.points()[" + data.index + "],\n  tangent: parentPath." + data.direction.toLowerCase() + "Tangents()[" + data.index + "]\n};";
-        datafooter = "createPath(\n  vertices.map((index, i) => {\n    let offsetX = 0;\n    let offsetY = 0;\n    Object.keys(data).forEach((val, e) => {\n      if (i < 1 || val !== \"tangent\") {\n        offsetX = offsetX + data[val][0];\n        offsetY = offsetY + data[val][1];\n      }\n    });\n    return [offsetX, offsetY];\n  }), [], [], false\n);\n";
+        datablock = "createPath([\n  parent.toComp(path.points()[" + data.index + "]), \n  parent.toComp(add(path." + data.direction.toLowerCase() + "Tangents()[" + data.index + "], path.points()[" + data.index + "]))\n]);";
     }
     var fullChain = [];
     for (var i = 0; i < data.chain.length; i++)
         fullChain.push(".content(\"" + data.chain[i] + "\")");
-    return "const parentLayer = thisComp.layer(\"" + data.parentLayerName + "\");\nconst parentPath = parentLayer" + fullChain.join("") + ".content(\"" + data.parentPathName + "\").path;\n" + datablock + "\n\n" + datafooter;
+    var header = "const parent = thisComp.layer(\"" + data.parentLayerName + "\");\nconst path = parent" + fullChain.join("") + ".content(\"" + data.parentPathName + "\").path;";
+    return "// mason v" + config.version + "\n" + header + "\n" + datablock;
 }
 function createChainedGroups(config, layer, data) {
     var propGroup = layer;
